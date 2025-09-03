@@ -10,7 +10,17 @@ LCD_esp32s3::LCD_esp32s3() {
 
 // Деструктор: освобождение ресурсов
 LCD_esp32s3::~LCD_esp32s3() {
+    if (_buf16) {
+        heap_caps_free(_buf16);
+        _buf16 = nullptr;
+    }
 
+    if (_buf8) {
+        heap_caps_free(_buf8);
+        _buf8 = nullptr;
+    }
+
+    free(_fastY); _fastY = nullptr;
 }
 
 void LCD_esp32s3::regCallbackSemaphore() {
@@ -22,13 +32,15 @@ void LCD_esp32s3::regCallbackSemaphore() {
         cbs.on_frame_buf_complete = on_frame_buf_complete;
     ESP_ERROR_CHECK(esp_lcd_rgb_panel_register_event_callbacks(_panel_handle, &cbs, this));
 
-    _sem_vsync_end = xSemaphoreCreateBinary();
-    assert(_sem_vsync_end);
-    xSemaphoreGive(_sem_vsync_end); // Инициализируем в свободное состояние
+    if (_dBuff){
+        _sem_vsync_end = xSemaphoreCreateBinary();
+        assert(_sem_vsync_end);
+        xSemaphoreGive(_sem_vsync_end); // Инициализируем в свободное состояние
 
-    _sem_gui_ready = xSemaphoreCreateBinary();
-    assert(_sem_gui_ready);
-    xSemaphoreGive(_sem_gui_ready); // Инициализируем в свободное состояние
+        _sem_gui_ready = xSemaphoreCreateBinary();
+        assert(_sem_gui_ready);
+        xSemaphoreGive(_sem_gui_ready); // Инициализируем в свободное состояние
+    }
 }
 
 void LCD_esp32s3::printInfo(){
@@ -53,40 +65,45 @@ bool LCD_esp32s3::setPanelConfig() {
     // Настройка пинов для 8-битного или 16-битного режима
     if (_bpp == 16) {
         // 16-битный режим (RGB565)
-        panel_config.data_gpio_nums[0]  = VGA_PIN_NUM_DATA15; // B
-        panel_config.data_gpio_nums[1]  = VGA_PIN_NUM_DATA14;
-        panel_config.data_gpio_nums[2]  = VGA_PIN_NUM_DATA13;
-        panel_config.data_gpio_nums[3]  = VGA_PIN_NUM_DATA12;
-        panel_config.data_gpio_nums[4]  = VGA_PIN_NUM_DATA11;
-        panel_config.data_gpio_nums[5]  = VGA_PIN_NUM_DATA10; // G
-        panel_config.data_gpio_nums[6]  = VGA_PIN_NUM_DATA9;
-        panel_config.data_gpio_nums[7]  = VGA_PIN_NUM_DATA8;
-        panel_config.data_gpio_nums[8]  = VGA_PIN_NUM_DATA7;
-        panel_config.data_gpio_nums[9]  = VGA_PIN_NUM_DATA6;
-        panel_config.data_gpio_nums[10] = VGA_PIN_NUM_DATA5;
-        panel_config.data_gpio_nums[11] = VGA_PIN_NUM_DATA4;  // R
-        panel_config.data_gpio_nums[12] = VGA_PIN_NUM_DATA3;
-        panel_config.data_gpio_nums[13] = VGA_PIN_NUM_DATA2;
-        panel_config.data_gpio_nums[14] = VGA_PIN_NUM_DATA1;
-        panel_config.data_gpio_nums[15] = VGA_PIN_NUM_DATA0;
+        
+        //panel_config.data_gpio_nums[0]  = _pins[15]; // B
+        panel_config.data_gpio_nums[1]  = _pins[14];
+        panel_config.data_gpio_nums[2]  = _pins[13];
+        panel_config.data_gpio_nums[3]  = _pins[12];
+        panel_config.data_gpio_nums[4]  = _pins[11];
+
+        //panel_config.data_gpio_nums[5]  = _pins[10]; // G
+        panel_config.data_gpio_nums[6]  = _pins[9];
+        panel_config.data_gpio_nums[7]  = _pins[8];
+        panel_config.data_gpio_nums[8]  = _pins[7];
+        panel_config.data_gpio_nums[9]  = _pins[6];
+        panel_config.data_gpio_nums[10] = _pins[5];
+
+        panel_config.data_gpio_nums[11] = _pins[4];  // R
+        panel_config.data_gpio_nums[12] = _pins[3];
+        panel_config.data_gpio_nums[13] = _pins[2];
+        panel_config.data_gpio_nums[14] = _pins[1];
+        panel_config.data_gpio_nums[15] = _pins[0];
     } else {
         // 8-битный режим
-        panel_config.data_gpio_nums[0] = VGA_PIN_NUM_DATA12; // B
-        panel_config.data_gpio_nums[1] = VGA_PIN_NUM_DATA11;
-        panel_config.data_gpio_nums[2] = VGA_PIN_NUM_DATA7;  // G
-        panel_config.data_gpio_nums[3] = VGA_PIN_NUM_DATA6;
-        panel_config.data_gpio_nums[4] = VGA_PIN_NUM_DATA5;
-        panel_config.data_gpio_nums[5] = VGA_PIN_NUM_DATA2;  // R
-        panel_config.data_gpio_nums[6] = VGA_PIN_NUM_DATA1;
-        panel_config.data_gpio_nums[7] = VGA_PIN_NUM_DATA0;
+        panel_config.data_gpio_nums[0] = _pins[12]; // B
+        panel_config.data_gpio_nums[1] = _pins[11];
+        panel_config.data_gpio_nums[2] = _pins[7];  // G
+        panel_config.data_gpio_nums[3] = _pins[6];
+        panel_config.data_gpio_nums[4] = _pins[5];
+        panel_config.data_gpio_nums[5] = _pins[2];  // R
+        panel_config.data_gpio_nums[6] = _pins[1];
+        panel_config.data_gpio_nums[7] = _pins[0];
     }
 
     // Настройка управляющих сигналов
     panel_config.disp_gpio_num  = VGA_PIN_NUM_DISP_EN;  // Не используется
     panel_config.pclk_gpio_num  = VGA_PIN_NUM_PCLK;     // Не используется
     panel_config.de_gpio_num    = VGA_PIN_NUM_DE;       // Не используется
-    panel_config.vsync_gpio_num = VGA_PIN_NUM_VSYNC;    // VSYNC
-    panel_config.hsync_gpio_num = VGA_PIN_NUM_HSYNC;    // HSYNC
+    panel_config.hsync_gpio_num = 1;//_pins[16];    // HSYNC
+    panel_config.vsync_gpio_num = 2;//_pins[17];    // VSYNC
+    for (int i = 0; i < 18; i++)
+        Serial.println(_pins[i]);
 
     // Тайминги для VGA из LCD_esp32s3.h)dma_burst_size
     panel_config.clk_src                    = LCD_CLK_SRC_PLL240M;  // Источник тактового сигнала
@@ -106,9 +123,13 @@ bool LCD_esp32s3::setPanelConfig() {
     panel_config.bounce_buffer_size_px  = _bounce_buffer_size_px;
     panel_config.sram_trans_align       = 4;
     panel_config.psram_trans_align      = _alignBuff;
-    panel_config.flags.fb_in_psram      = _psRam;
+    panel_config.flags.fb_in_psram      = false;
     panel_config.num_fbs                = 0;
     panel_config.flags.no_fb            = true;
+
+    panel_config.timings.flags.pclk_active_neg = true;//+
+    panel_config.timings.flags.hsync_idle_low = true;
+    panel_config.timings.flags.vsync_idle_low = true;
 
 
     // Создание RGB-панели
@@ -143,10 +164,15 @@ bool LCD_esp32s3::setPanelConfig() {
     }
     
     regCallbackSemaphore();
-    esp_lcd_panel_disp_on_off(_panel_handle, true);
+    //esp_lcd_panel_disp_on_off(_panel_handle, true);
 
     printInfo();
     Serial.println("Init...Ok");
+
+    _fastY = (int*) malloc(_scrHeight * sizeof(int));
+    for (int y = 0; y < _scrHeight; y++)
+        _fastY[y] = _scrWidth * y;
+
     return true;
 }
 
@@ -156,63 +182,109 @@ bool IRAM_ATTR LCD_esp32s3::on_bounce_empty(
     void *bounce_buf,
     int pos_px,
     int len_bytes,
-    void *user_ctx)
-{
+    void *user_ctx){
+
     LCD_esp32s3* vga = (LCD_esp32s3*)user_ctx;
+    int lines = vga->_lines;
 
-    uint8_t* dest = (uint8_t*)bounce_buf;
+    if (vga->getBpp() == 16){
+        uint16_t* dest = (uint16_t*)bounce_buf;
+        uint16_t* sour = vga->_buf16 + vga->_frontBuff;
 
-    if (vga->_scale == 0){
-        uint8_t* sour = vga->_buf8 + vga->_frontBuff + pos_px;
-        memcpy(dest, sour, len_bytes);
-    } else if (vga->_scale == 1){
-        uint8_t* sour = vga->_buf8 + vga->_frontBuff + (pos_px >> 2);
-        int lines = vga->_lines;
+        if (vga->getScale() == 0){
+            sour += pos_px;
+            memcpy(dest, sour, len_bytes);
+        } else if (vga->getScale() == 1){
+            sour += pos_px >> 2;
 
-        while (lines-- > 0){
-            int tik = vga->_tik;
-            uint8_t* savePos = dest;
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint16_t* savePos = dest;
 
-            while (tik-- > 0){
-                *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
-                *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
-                *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
-                *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
-            }
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++);                     
+                }
 
-            memcpy(dest, savePos, vga->_width);
-            dest += vga->_width;
+                memcpy(dest, savePos, vga->_width2X);
+                dest += vga->_width;  
+            }    
+        } else {
+            sour += pos_px >> 4;
+
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                auto savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                }
+
+                memcpy(dest, savePos, vga->_width2X); 
+                dest += vga->_width;
+                memcpy(dest, savePos, vga->_width4X); 
+                dest += vga->_width2X;
+            }     
         }
     } else {
-        uint8_t* sour = vga->_buf8 + vga->_frontBuff + (pos_px >> 4);
-        int lines = vga->_lines;
+        uint8_t* dest = (uint8_t*)bounce_buf;
+        uint8_t* sour = vga->_buf8 + vga->_frontBuff;
 
-        while (lines-- > 0){
-            int tik = vga->_tik;
-            uint8_t* savePos = dest;
+        if (vga->getScale() == 0){
+            sour += pos_px;
+            memcpy(dest, sour, len_bytes);
+        } else if (vga->getScale() == 1){
+            sour += pos_px >> 2;
 
-            while (tik-- > 0){
-                *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
-                *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
-                *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
-                *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint8_t* savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++);                     
+                }
+
+                memcpy(dest, savePos, vga->_width);
+                dest += vga->_width;                
             }
+        } else {
+            sour += pos_px >> 4;
 
-            memcpy(dest, savePos, vga->_width); 
-            dest += vga->_width;
-            memcpy(dest, savePos, vga->_width2X); 
-            dest += vga->_width2X;
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint8_t* savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                }
+
+                memcpy(dest, savePos, vga->_width); 
+                dest += vga->_width;
+                memcpy(dest, savePos, vga->_width2X); 
+                dest += vga->_width2X;
+            }                
         }
-    }   
+    }
 
     // Последний bounce → пробуем сменить буфер
-    if (pos_px >= vga->_lastBounceBufferPos && vga->_dBuff && vga->_swap) {
+    if (pos_px >= vga->_lastBounceBufferPos && vga->_dBuff) {
         if (xSemaphoreTakeFromISR(vga->_sem_gui_ready, NULL) == pdTRUE) {
             std::swap(vga->_frontBuff, vga->_backBuff);
             xSemaphoreGiveFromISR(vga->_sem_vsync_end, NULL);
         }
-    }
-
+    }        
+ 
     return true;
 }
 
@@ -239,6 +311,37 @@ bool IRAM_ATTR LCD_esp32s3::on_frame_buf_complete(esp_lcd_panel_handle_t panel, 
     return false; 
 }
 //*****************************************************************************************/
+void LCD_esp32s3::setPins(uint8_t r0, uint8_t r1, uint8_t r2, uint8_t r3, uint8_t r4, 
+                          uint8_t g0, uint8_t g1, uint8_t g2, uint8_t g3, uint8_t g4, uint8_t g5,
+                          uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4,
+                          uint8_t h_sync, uint8_t v_sync){
+    
+    //Red pins
+    _pins[0] = r0;
+    _pins[1] = r1;
+    _pins[2] = r2;
+    _pins[3] = r3;
+    _pins[4] = r4;
+
+    //Green pins
+    _pins[5] = g0;
+    _pins[6] = g1;
+    _pins[7] = g2;
+    _pins[8] = g3;
+    _pins[9] = g4;
+    _pins[10] = g5;
+
+    //Blue pins
+    _pins[11] = b0;
+    _pins[12] = b1;
+    _pins[13] = b2;
+    _pins[14] = b3;
+    _pins[15] = b4;
+
+    //H_Sync, V_Sync
+    _pins[16] = h_sync;
+    _pins[17] = v_sync;
+}                     
 
 // Инициализация дисплея
 bool LCD_esp32s3::init(const int *mode, bool dBuff, bool psRam) {
@@ -289,6 +392,7 @@ bool LCD_esp32s3::init(const int *mode, bool dBuff, bool psRam) {
     _tik = _width >> 4;
     _lines = _bounce_buffer_size_px / _width >> _scale;
     _width2X = _width << 1;
+    _width4X = _width2X << 1;
     setViewport(0, 0, _scrXX, _scrYY);
 
     if (!setPanelConfig()) return false;
@@ -317,7 +421,6 @@ void LCD_esp32s3::setViewport(int x1, int y1, int x2, int y2) {
 
 void LCD_esp32s3::swap() {
     if (_dBuff){
-        _swap = true;
         xSemaphoreGive(_sem_gui_ready);
         xSemaphoreTake(_sem_vsync_end, portMAX_DELAY);
     }
@@ -508,4 +611,193 @@ panel_config.flags.no_fb = false;
             assert(_buf8[0]);
             memset(_buf8[0], 0, _scrSize);
         } 
-    //  */
+    //  
+//CallBack's*****************************************************
+bool IRAM_ATTR LCD_esp32s3::on_bounce_empty(
+    esp_lcd_panel_handle_t panel,
+    void *bounce_buf,
+    int pos_px,
+    int len_bytes,
+    void *user_ctx){
+    LCD_esp32s3* vga = (LCD_esp32s3*)user_ctx;
+
+    if (vga->_bpp == 16){
+        uint16_t* dest = (uint16_t*)bounce_buf;
+
+        if (vga->_scale == 0){
+            uint16_t* sour = vga->_buf16 + vga->_frontBuff + pos_px;
+            memcpy(dest, sour, len_bytes);
+        } else if (vga->_scale == 1) {
+
+        } else {
+
+        }
+    } else {
+        uint8_t* dest = (uint8_t*)bounce_buf;
+
+        if (vga->_scale == 0){
+            uint8_t* sour = vga->_buf8 + vga->_frontBuff + pos_px;
+            memcpy(dest, sour, len_bytes);
+        } else if (vga->_scale == 1){
+            uint8_t* sour = vga->_buf8 + vga->_frontBuff + (pos_px >> 2);
+            int lines = vga->_lines;
+
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint8_t* savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                }
+
+                memcpy(dest, savePos, vga->_width);
+                dest += vga->_width;
+            }
+        } else {
+            uint8_t* sour = vga->_buf8 + vga->_frontBuff + (pos_px >> 4);
+            int lines = vga->_lines;
+
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint8_t* savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                }
+
+                memcpy(dest, savePos, vga->_width); 
+                dest += vga->_width;
+                memcpy(dest, savePos, vga->_width2X); 
+                dest += vga->_width2X;
+            }
+        }   
+    }
+
+    // Последний bounce → пробуем сменить буфер
+    if (pos_px >= vga->_lastBounceBufferPos && vga->_dBuff && vga->_swap) {
+        if (xSemaphoreTakeFromISR(vga->_sem_gui_ready, NULL) == pdTRUE) {
+            std::swap(vga->_frontBuff, vga->_backBuff);
+            xSemaphoreGiveFromISR(vga->_sem_vsync_end, NULL);
+        }
+    }
+
+    return true;
+}
+
+bool IRAM_ATTR LCD_esp32s3::on_bounce_empty(
+    esp_lcd_panel_handle_t panel,
+    void *bounce_buf,
+    int pos_px,
+    int len_bytes,
+    void *user_ctx){
+
+    LCD_esp32s3* vga = (LCD_esp32s3*)user_ctx;
+    int lines = vga->_lines;
+
+    if (vga->getBpp() == 16){
+        uint16_t* dest = (uint16_t*)bounce_buf;
+        uint16_t* sour = vga->_buf16 + vga->_frontBuff;
+
+        if (vga->getScale() == 0){
+            sour += pos_px;
+            memcpy(dest, sour, len_bytes);
+        } else if (vga->getScale() == 1){
+            sour += pos_px >> 2;
+
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint16_t* savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++);                     
+                }
+
+                memcpy(dest, savePos, vga->_width2X);
+                dest += vga->_width;  
+            }    
+        } else {
+            sour += pos_px >> 4;
+
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                auto savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                }
+
+                memcpy(dest, savePos, vga->_width2X); 
+                dest += vga->_width;
+                memcpy(dest, savePos, vga->_width4X); 
+                dest += vga->_width2X;
+            }     
+        }
+    } else {
+        uint8_t* dest = (uint8_t*)bounce_buf;
+        uint8_t* sour = vga->_buf8 + vga->_frontBuff;
+
+        if (vga->getScale() == 0){
+            sour += pos_px;
+            memcpy(dest, sour, len_bytes);
+        } else if (vga->getScale() == 1){
+            sour += pos_px >> 2;
+
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint8_t* savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++); 
+                    *(dest++) = *sour; *(dest++) = *(sour++); *(dest++) = *sour; *(dest++) = *(sour++);                     
+                }
+
+                memcpy(dest, savePos, vga->_width);
+                dest += vga->_width;                
+            }
+        } else {
+            sour += pos_px >> 4;
+
+            while (lines-- > 0){
+                int tik = vga->_tik;
+                uint8_t* savePos = dest;
+
+                while (tik-- > 0){
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                    *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
+                }
+
+                memcpy(dest, savePos, vga->_width); 
+                dest += vga->_width;
+                memcpy(dest, savePos, vga->_width2X); 
+                dest += vga->_width2X;
+            }                
+        }
+    }
+
+    // Последний bounce → пробуем сменить буфер
+    if (pos_px >= vga->_lastBounceBufferPos && vga->_dBuff) {
+        if (xSemaphoreTakeFromISR(vga->_sem_gui_ready, NULL) == pdTRUE) {
+            std::swap(vga->_frontBuff, vga->_backBuff);
+            xSemaphoreGiveFromISR(vga->_sem_vsync_end, NULL);
+        }
+    }        
+ 
+    return true;
+}
+    // */

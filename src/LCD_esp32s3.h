@@ -64,21 +64,35 @@ class LCD_esp32s3{
         //V back porch, V front porch, V pulse width,
         //DivX, DivY
 
+        //Mode ok
         static constexpr int MODE160x120x8[] = {25'000'000, 640, 480, 8, 8, 48, 16, 96, 33, 10, 2, 2, 30720};//10
         static constexpr int MODE320x240x8[] = {25'000'000, 640, 480, 8, 8, 48, 16, 96, 33, 10, 2, 1, 30720};
         static constexpr int MODE640x480x8[] = {25'000'000, 640, 480, 8, 8, 48, 16, 96, 33, 10, 2, 0, 30720};
+        static constexpr int MODE200x150x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 2, 30000};//48000
+        static constexpr int MODE400x300x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 1, 30000};
+        static constexpr int MODE800x600x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 0, 30000};
+        static constexpr int MODE160x120x16[] = {25'000'000, 640, 480, 16, 16, 48, 16, 96, 33, 10, 2, 2, 30720};//10
+        static constexpr int MODE320x240x16[] = {25'000'000, 640, 480, 16, 16, 48, 16, 96, 33, 10, 2, 1, 30720};
+        static constexpr int MODE640x480x16[] = {25'000'000, 640, 480, 16, 16, 48, 16, 96, 33, 10, 2, 0, 30720};
 
-        static constexpr int MODE200x150x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 2, 48000};//10
-        static constexpr int MODE400x300x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 1, 48000};
-        static constexpr int MODE800x600x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 0, 48000};
-
+        //Mode crash!!!
         static constexpr int MODE256x192x8[] = {60'000'000, 1024, 768, 8, 8, 160, 24, 136, 29, 3, 6, 2, 49152};//16
         static constexpr int MODE512x384x8[] = {60'000'000, 1024, 768, 8, 8, 160, 24, 136, 29, 3, 6, 1, 65536};
-        static constexpr int MODE1024x768x8[] = {60'000'000, 1024, 768, 8, 8, 160, 24, 136, 29, 3, 6, 0, 32768};
-        
+        static constexpr int MODE1024x768x8[] = {60000000, 1024, 768, 8, 8, 160, 24, 136, 29, 3, 6, 0, 12288};
+        static constexpr int MODE200x150x16[] = {40'000'000, 800, 600, 16, 16, 88, 40, 128, 23, 1, 4, 2, 48000};//10
+        static constexpr int MODE400x300x16[] = {40'000'000, 800, 600, 16, 16, 88, 40, 128, 23, 1, 4, 1, 48000};
+        static constexpr int MODE800x600x16[] = {40'000'000, 800, 600, 16, 16, 88, 40, 128, 23, 1, 4, 0, 30000};
+        static constexpr int MODE256x192x16[] = {60'000'000, 1024, 768, 16, 16, 160, 24, 136, 29, 3, 6, 2, 49152};//16
+        static constexpr int MODE512x384x16[] = {60'000'000, 1024, 768, 16, 16, 160, 24, 136, 29, 3, 6, 1, 65536};
+        static constexpr int MODE1024x768x16[] = {60'000'000, 1024, 768, 16, 16, 160, 24, 136, 29, 3, 6, 0, 32768};
+
+        //               r  r  r  r  r   g   g   g   g  g  g   b   b   b   b   b   h  v
+        //               0  1  2  3  4   5   6   7   8  9  10  11  12  13  14  15  16 17
+        int _pins[18] = {4, 5, 6, 7, 15, 16, 17, 18, 8, 9, 14, 10, 11, 12, 13, 21, 1, 2};
+
         uint8_t* _buf8 = nullptr;
-		uint16_t* _buf16 = nullptr;
-        uint32_t* _fastY = nullptr;
+		uint16_t* _buf16 = nullptr; 
+        int* _fastY = nullptr;
         int _frontBuff, _backBuff;
         bool _swap = false;
         bool _swapRequest = false;
@@ -109,6 +123,11 @@ class LCD_esp32s3{
         int get_vWidth()    {return _vWidth;};
         int get_vHeight()   {return _vHeight;};
         
+        void setPins(uint8_t r0, uint8_t r1, uint8_t r2, uint8_t r3, uint8_t r4, 
+                     uint8_t g0, uint8_t g1, uint8_t g2, uint8_t g3, uint8_t g4, uint8_t g5,
+                     uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4,
+                     uint8_t h_sync = 1, uint8_t v_sync = 2);
+
         bool init(const int *mode, bool dBuff = true, bool psRam = true);
         void printInfo();
         void setViewport(int x1, int y1, int x2, int y2);
@@ -130,7 +149,7 @@ class LCD_esp32s3{
         int _alignBuff;        
         bool _psRam, _dBuff;
         int _lines, _tik;
-        int _width2X;
+        int _width2X, _width4X;
 
         //Screen
         int _scrWidth, _scrHeight;
@@ -163,3 +182,36 @@ class LCD_esp32s3{
 //g = min((rand() & 31) + g, 255);
 //b = min((rand() & 63) + b, 255);
 //buffer[mode->hRes * v + h] = (r >> 5) | ((g >> 5) << 3) | ((b >>))
+
+/*
+    // Настройка пинов для 8-битного или 16-битного режима
+    if (_bpp == 16) {
+        // 16-битный режим (RGB565)
+        panel_config.data_gpio_nums[0]  = VGA_PIN_NUM_DATA15; // B
+        panel_config.data_gpio_nums[1]  = VGA_PIN_NUM_DATA14;
+        panel_config.data_gpio_nums[2]  = VGA_PIN_NUM_DATA13;
+        panel_config.data_gpio_nums[3]  = VGA_PIN_NUM_DATA12;
+        panel_config.data_gpio_nums[4]  = VGA_PIN_NUM_DATA11;
+        panel_config.data_gpio_nums[5]  = VGA_PIN_NUM_DATA10; // G
+        panel_config.data_gpio_nums[6]  = VGA_PIN_NUM_DATA9;
+        panel_config.data_gpio_nums[7]  = VGA_PIN_NUM_DATA8;
+        panel_config.data_gpio_nums[8]  = VGA_PIN_NUM_DATA7;
+        panel_config.data_gpio_nums[9]  = VGA_PIN_NUM_DATA6;
+        panel_config.data_gpio_nums[10] = VGA_PIN_NUM_DATA5;
+        panel_config.data_gpio_nums[11] = VGA_PIN_NUM_DATA4;  // R
+        panel_config.data_gpio_nums[12] = VGA_PIN_NUM_DATA3;
+        panel_config.data_gpio_nums[13] = VGA_PIN_NUM_DATA2;
+        panel_config.data_gpio_nums[14] = VGA_PIN_NUM_DATA1;
+        panel_config.data_gpio_nums[15] = VGA_PIN_NUM_DATA0;
+    } else {
+        // 8-битный режим
+        panel_config.data_gpio_nums[0] = VGA_PIN_NUM_DATA12; // B
+        panel_config.data_gpio_nums[1] = VGA_PIN_NUM_DATA11;
+        panel_config.data_gpio_nums[2] = VGA_PIN_NUM_DATA7;  // G
+        panel_config.data_gpio_nums[3] = VGA_PIN_NUM_DATA6;
+        panel_config.data_gpio_nums[4] = VGA_PIN_NUM_DATA5;
+        panel_config.data_gpio_nums[5] = VGA_PIN_NUM_DATA2;  // R
+        panel_config.data_gpio_nums[6] = VGA_PIN_NUM_DATA1;
+        panel_config.data_gpio_nums[7] = VGA_PIN_NUM_DATA0;
+    }
+*/
