@@ -28,10 +28,11 @@ int LCD_GFX::getCol(int r, int g, int b) {
 void LCD_GFX::cls(uint16_t col){
     if (_vga.getBpp() == 16){
         uint16_t* scr = _vga._buf16 + _vga._backBuff;
+        
         memset(scr, col, _vga.getScrSize() << 1);
     } else {        
         uint8_t color = (uint8_t)(col & 0xFF); 
-        uint8_t* scr = _vga._buf8;// + _vga._backBuff;
+        uint8_t* scr = _vga._buf8 + _vga._backBuff;
 
         memset(scr, color, _vga.getScrSize());
     } 

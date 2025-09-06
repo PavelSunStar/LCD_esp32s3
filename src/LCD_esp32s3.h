@@ -60,31 +60,28 @@
 class LCD_esp32s3{
     public:
         //Pixel clock, hRes, VRes, ColBit, BPP
-        //H back porch, H front porch, H pulse width,
-        //V back porch, V front porch, V pulse width,
-        //DivX, DivY
+        //H front porch, H pulse width, H back porch, 
+        //V front porch, V pulse width, V back porch, 
+        //Scale, _bounce_buffer_size_px
 
         //Mode ok
-        static constexpr int MODE160x120x8[] = {25'000'000, 640, 480, 8, 8, 48, 16, 96, 33, 10, 2, 2, 30720};//10
-        static constexpr int MODE320x240x8[] = {25'000'000, 640, 480, 8, 8, 48, 16, 96, 33, 10, 2, 1, 30720};
-        static constexpr int MODE640x480x8[] = {25'000'000, 640, 480, 8, 8, 48, 16, 96, 33, 10, 2, 0, 30720};
-        static constexpr int MODE200x150x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 2, 30000};//48000
-        static constexpr int MODE400x300x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 1, 30000};
-        static constexpr int MODE800x600x8[] = {40'000'000, 800, 600, 8, 8, 88, 40, 128, 23, 1, 4, 0, 30000};
-        static constexpr int MODE160x120x16[] = {25'000'000, 640, 480, 16, 16, 48, 16, 96, 33, 10, 2, 2, 30720};//10
-        static constexpr int MODE320x240x16[] = {25'000'000, 640, 480, 16, 16, 48, 16, 96, 33, 10, 2, 1, 30720};
-        static constexpr int MODE640x480x16[] = {25'000'000, 640, 480, 16, 16, 48, 16, 96, 33, 10, 2, 0, 30720};
+        static constexpr int MODE512x384x8[] = {20'000'000, 512, 384, 8, 8, 8, 62, 42, 1, 5, 26, 16384};//+++
+        static constexpr int MODE640x350x8[] = {25'000'000, 640, 350, 8, 8, 16, 96, 48, 37, 2, 60, 16000};//+--
+        static constexpr int MODE640x400x8[] = {25'000'000, 640, 400, 8, 8, 16, 96, 48, 12, 2, 35, 25600};//+++
+        static constexpr int MODE640x480x8[] = {25'000'000, 640, 480, 8, 8, 16, 96, 48, 10, 2, 33, 15360};//+++
+        static constexpr int MODE720x400x8[] = {30'000'000, 720, 400, 8, 8, 36, 72, 108, 1, 3, 42, 14400};//+++
+        static constexpr int MODE768x576x8[] = {30'000'000, 768, 576, 8, 8, 24, 80, 104, 1, 3, 17, 18432};//+++
+        static constexpr int MODE800x600x8[] = {40'000'000, 800, 600, 8, 8, 40, 128, 88, 1, 4, 23, 16000};//+++
+        static constexpr int MODE1024x768x8[] = {65'000'000, 1024, 768, 8, 8, 8, 176, 56, 0, 8, 41, 49152};//-++   
 
-        //Mode crash!!!
-        static constexpr int MODE256x192x8[] = {60'000'000, 1024, 768, 8, 8, 160, 24, 136, 29, 3, 6, 2, 49152};//16
-        static constexpr int MODE512x384x8[] = {60'000'000, 1024, 768, 8, 8, 160, 24, 136, 29, 3, 6, 1, 65536};
-        static constexpr int MODE1024x768x8[] = {60000000, 1024, 768, 8, 8, 160, 24, 136, 29, 3, 6, 0, 12288};
-        static constexpr int MODE200x150x16[] = {40'000'000, 800, 600, 16, 16, 88, 40, 128, 23, 1, 4, 2, 48000};//10
-        static constexpr int MODE400x300x16[] = {40'000'000, 800, 600, 16, 16, 88, 40, 128, 23, 1, 4, 1, 48000};
-        static constexpr int MODE800x600x16[] = {40'000'000, 800, 600, 16, 16, 88, 40, 128, 23, 1, 4, 0, 30000};
-        static constexpr int MODE256x192x16[] = {60'000'000, 1024, 768, 16, 16, 160, 24, 136, 29, 3, 6, 2, 49152};//16
-        static constexpr int MODE512x384x16[] = {60'000'000, 1024, 768, 16, 16, 160, 24, 136, 29, 3, 6, 1, 65536};
-        static constexpr int MODE1024x768x16[] = {60'000'000, 1024, 768, 16, 16, 160, 24, 136, 29, 3, 6, 0, 32768};
+        static constexpr int MODE512x384x16[] = {20'000'000, 512, 384, 16, 16, 8, 62, 42, 1, 5, 26, 16384};//+++
+        static constexpr int MODE640x350x16[] = {25'000'000, 640, 350, 16, 16, 16, 96, 48, 37, 2, 60, 16000};//+--
+        static constexpr int MODE640x400x16[] = {25'000'000, 640, 400, 16, 16, 16, 96, 48, 12, 2, 35, 25600};//+++
+        static constexpr int MODE640x480x16[] = {25'000'000, 640, 480, 16, 16, 16, 96, 48, 10, 2, 33, 15360};//+++
+        static constexpr int MODE720x400x16[] = {30'000'000, 720, 400, 16, 16, 36, 72, 108, 1, 3, 42, 14400};//+++
+        static constexpr int MODE768x576x16[] = {30'000'000, 768, 576, 16, 16, 24, 80, 104, 1, 3, 17, 18432};//-++
+        static constexpr int MODE800x600x16[] = {40'000'000, 800, 600, 16, 16, 40, 128, 88, 1, 4, 23, 16000};//---
+        static constexpr int MODE1024x768x16[] = {65'000'000, 1024, 768, 16, 16, 8, 176, 56, 0, 8, 41, 49152};//---  
 
         //               r  r  r  r  r   g   g   g   g  g  g   b   b   b   b   b   h  v
         //               0  1  2  3  4   5   6   7   8  9  10  11  12  13  14  15  16 17
@@ -128,7 +125,7 @@ class LCD_esp32s3{
                      uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4,
                      uint8_t h_sync = 1, uint8_t v_sync = 2);
 
-        bool init(const int *mode, bool dBuff = true, bool psRam = true);
+        bool init(const int *mode, int scale = 0, bool dBuff = true, bool psRam = true);
         void printInfo();
         void setViewport(int x1, int y1, int x2, int y2);
         void swap();   
@@ -146,7 +143,6 @@ class LCD_esp32s3{
         int _vsync_pulse_width; 
         int _scale; 
         size_t _bounce_buffer_size_px, _lastBounceBufferPos;
-        int _alignBuff;        
         bool _psRam, _dBuff;
         int _lines, _tik;
         int _width2X, _width4X;

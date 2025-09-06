@@ -64,15 +64,14 @@ bool LCD_esp32s3::setPanelConfig() {
 
     // Настройка пинов для 8-битного или 16-битного режима
     if (_bpp == 16) {
-        // 16-битный режим (RGB565)
-        
-        //panel_config.data_gpio_nums[0]  = _pins[15]; // B
+        // 16-битный режим (RGB565)        
+        panel_config.data_gpio_nums[0]  = _pins[15]; // B
         panel_config.data_gpio_nums[1]  = _pins[14];
         panel_config.data_gpio_nums[2]  = _pins[13];
         panel_config.data_gpio_nums[3]  = _pins[12];
         panel_config.data_gpio_nums[4]  = _pins[11];
 
-        //panel_config.data_gpio_nums[5]  = _pins[10]; // G
+        panel_config.data_gpio_nums[5]  = _pins[10]; // G
         panel_config.data_gpio_nums[6]  = _pins[9];
         panel_config.data_gpio_nums[7]  = _pins[8];
         panel_config.data_gpio_nums[8]  = _pins[7];
@@ -100,10 +99,8 @@ bool LCD_esp32s3::setPanelConfig() {
     panel_config.disp_gpio_num  = VGA_PIN_NUM_DISP_EN;  // Не используется
     panel_config.pclk_gpio_num  = VGA_PIN_NUM_PCLK;     // Не используется
     panel_config.de_gpio_num    = VGA_PIN_NUM_DE;       // Не используется
-    panel_config.hsync_gpio_num = 1;//_pins[16];    // HSYNC
-    panel_config.vsync_gpio_num = 2;//_pins[17];    // VSYNC
-    for (int i = 0; i < 18; i++)
-        Serial.println(_pins[i]);
+    panel_config.hsync_gpio_num = _pins[16];    // HSYNC
+    panel_config.vsync_gpio_num = _pins[17];    // VSYNC
 
     // Тайминги для VGA из LCD_esp32s3.h)dma_burst_size
     panel_config.clk_src                    = LCD_CLK_SRC_PLL240M;  // Источник тактового сигнала
@@ -122,14 +119,14 @@ bool LCD_esp32s3::setPanelConfig() {
     panel_config.bits_per_pixel         = _bpp;
     panel_config.bounce_buffer_size_px  = _bounce_buffer_size_px;
     panel_config.sram_trans_align       = 4;
-    panel_config.psram_trans_align      = _alignBuff;
+    panel_config.psram_trans_align      = 64;
     panel_config.flags.fb_in_psram      = false;
     panel_config.num_fbs                = 0;
     panel_config.flags.no_fb            = true;
 
     panel_config.timings.flags.pclk_active_neg = true;//+
-    panel_config.timings.flags.hsync_idle_low = true;
-    panel_config.timings.flags.vsync_idle_low = true;
+    //panel_config.timings.flags.hsync_idle_low = true;
+    //panel_config.timings.flags.vsync_idle_low = true;
 
 
     // Создание RGB-панели
@@ -216,7 +213,7 @@ bool IRAM_ATTR LCD_esp32s3::on_bounce_empty(
 
             while (lines-- > 0){
                 int tik = vga->_tik;
-                auto savePos = dest;
+                uint16_t* savePos = dest;
 
                 while (tik-- > 0){
                     *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *sour; *(dest++) = *(sour++);  
@@ -233,7 +230,7 @@ bool IRAM_ATTR LCD_esp32s3::on_bounce_empty(
         }
     } else {
         uint8_t* dest = (uint8_t*)bounce_buf;
-        uint8_t* sour = vga->_buf8 + vga->_frontBuff;
+        uint8_t* sour = vga->_buf8;// + vga->_frontBuff;
 
         if (vga->getScale() == 0){
             sour += pos_px;
@@ -257,7 +254,6 @@ bool IRAM_ATTR LCD_esp32s3::on_bounce_empty(
             }
         } else {
             sour += pos_px >> 4;
-
             while (lines-- > 0){
                 int tik = vga->_tik;
                 uint8_t* savePos = dest;
@@ -344,7 +340,7 @@ void LCD_esp32s3::setPins(uint8_t r0, uint8_t r1, uint8_t r2, uint8_t r3, uint8_
 }                     
 
 // Инициализация дисплея
-bool LCD_esp32s3::init(const int *mode, bool dBuff, bool psRam) {
+bool LCD_esp32s3::init(const int *mode, int scale, bool dBuff, bool psRam) {
     if (!mode) {
         Serial.println("ERROR: Mode array is null");
         return false;
@@ -359,23 +355,18 @@ bool LCD_esp32s3::init(const int *mode, bool dBuff, bool psRam) {
     _height                 = mode[2];
     _colBit                 = mode[3]; _colBit = (_colBit > 8) ? 16 : 8;
     _bpp                    = mode[4]; _bpp = (_bpp >= _colBit) ?  _colBit: _bpp; 
-    _hsync_back_porch       = mode[5];
-    _hsync_front_porch      = mode[6];
-    _hsync_pulse_width      = mode[7];
-    _vsync_back_porch       = mode[8];
-    _vsync_front_porch      = mode[9];
-    _vsync_pulse_width      = mode[10];
-    _scale                  = mode[11];
-    _bounce_buffer_size_px  = mode[12]; //_height / 10 * _width;//mode[12];
+    _hsync_front_porch      = mode[5];
+    _hsync_pulse_width      = mode[6];
+    _hsync_back_porch       = mode[7];
+    _vsync_front_porch      = mode[8];
+    _vsync_pulse_width      = mode[9];
+    _vsync_back_porch       = mode[10];
+    _bounce_buffer_size_px  = mode[11]; //_height / 10 * _width;//mode[12];
 
-    _alignBuff = (_bounce_buffer_size_px % 64 == 0) ? 64 :
-                 (_bounce_buffer_size_px % 32 == 0) ? 32 :
-                 (_bounce_buffer_size_px % 16 == 0) ? 16 :
-                 (_bounce_buffer_size_px % 8 == 0) ? 8 :
-                 (_bounce_buffer_size_px % 4 == 0) ? 4 :
-                 (_bounce_buffer_size_px % 2 == 0) ? 2 : 1;
+    _scale = (scale >= 2) ? 2 : (scale == 1 ? 1 : 0);
     _psRam = psRam;
     _dBuff = dBuff;
+
     _xx = _width - 1;
     _yy = _height - 1;    
     _size = _width * _height;
@@ -386,11 +377,11 @@ bool LCD_esp32s3::init(const int *mode, bool dBuff, bool psRam) {
     _scrXX = _scrWidth - 1;
     _scrYY = _scrHeight - 1;
     _scrSize = _scrWidth * _scrHeight * ((_colBit == 16) ? sizeof(uint16_t) : sizeof(uint8_t));
+
     _frontBuff = 0;
     _backBuff = (_dBuff) ? _scrSize : 0;
-
     _tik = _width >> 4;
-    _lines = _bounce_buffer_size_px / _width >> _scale;
+    _lines = (_bounce_buffer_size_px / _width) >> _scale;
     _width2X = _width << 1;
     _width4X = _width2X << 1;
     setViewport(0, 0, _scrXX, _scrYY);
